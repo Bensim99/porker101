@@ -173,6 +173,53 @@
         .total-val { color: var(--led-orange); text-shadow: 0 0 10px rgba(255, 170, 0, 0.4); }
         .current-val { color: var(--led-red); text-shadow: 0 0 10px rgba(255, 51, 51, 0.4); }
 
+        /* History Section */
+        .history-section {
+            margin-top: 30px;
+            width: 100%;
+            background: #222;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .history-title {
+            color: #aaa;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .history-item {
+            background: #333;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+        }
+
+        .history-date {
+            color: var(--led-orange);
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .history-scores {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .history-score-entry {
+            background: #444;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+
         /* Controls Container */
         .controls {
             margin-top: 20px;
@@ -222,6 +269,13 @@
                     <button class="secondary" style="flex:1" onclick="logout()">Exit</button>
                 </div>
             </div>
+
+            <!-- History List -->
+            <div id="historyContainer" class="history-section hidden">
+                <div class="history-title">Past Sessions History</div>
+                <div id="historyList"></div>
+            </div>
+
         </div>
     </div>
 
@@ -346,6 +400,48 @@
                     </div>
                 `;
                 list.appendChild(row);
+            });
+
+            // Render History
+            renderHistory(game);
+        }
+
+        function renderHistory(game) {
+            const historyContainer = document.getElementById('historyContainer');
+            const historyList = document.getElementById('historyList');
+            
+            // Only show if there are past sessions (more than 1 session total)
+            if (game.sessions.length <= 1) {
+                historyContainer.classList.add('hidden');
+                return;
+            }
+            
+            historyContainer.classList.remove('hidden');
+            historyList.innerHTML = '';
+
+            // Iterate through all sessions EXCEPT the last one (current)
+            // We reverse to show newest history first
+            const pastSessions = game.sessions.slice(0, -1).reverse();
+
+            pastSessions.forEach((session, index) => {
+                const dateStr = new Date(session.date).toLocaleString();
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                
+                let scoresHtml = '';
+                // Sort scores in history item by score value desc
+                const sessionEntries = Object.entries(session.scores)
+                    .sort(([, scoreA], [, scoreB]) => scoreB - scoreA);
+
+                sessionEntries.forEach(([pName, pScore]) => {
+                    scoresHtml += `<span class="history-score-entry">${pName}: ${pScore}</span>`;
+                });
+
+                item.innerHTML = `
+                    <span class="history-date">Session ${game.sessions.length - 1 - index} - ${dateStr}</span>
+                    <div class="history-scores">${scoresHtml}</div>
+                `;
+                historyList.appendChild(item);
             });
         }
 
