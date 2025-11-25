@@ -58,6 +58,7 @@
             text-align: center;
         }
 
+        /* Generic Button Styles */
         button {
             cursor: pointer;
             padding: 12px 24px;
@@ -79,6 +80,38 @@
         .join-btn {
             background: var(--led-orange);
             width: 50%;
+        }
+
+        /* Mode Switcher Styles */
+        .mode-switcher {
+            display: flex;
+            width: 100%;
+            background: #333;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: #777;
+            font-family: 'Black Ops One', cursive;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin: 0; /* Override generic button margin */
+            clip-path: none; /* Override generic button clip-path */
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #2a2a2a;
+            color: var(--led-orange);
+            border-bottom: 3px solid var(--led-orange);
         }
 
         /* Score Buttons Layout */
@@ -103,6 +136,14 @@
             font-size: 1.5rem;
             background: var(--led-red); /* Red */
             color: white;
+        }
+
+        /* Custom Input override */
+        .custom-controls-wrapper input {
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 1.5rem;
+            margin-bottom: 10px;
         }
 
         button.secondary {
@@ -219,7 +260,6 @@
             border-radius: 3px;
         }
 
-
         /* Controls Container */
         .controls {
             margin-top: 20px;
@@ -258,10 +298,25 @@
             </div>
 
             <div class="controls">
-                <!-- Score Buttons Layout -->
-                <div class="score-controls">
+                <!-- Mode Switcher -->
+                <div class="mode-switcher">
+                    <button id="modeStandard" class="mode-btn active" onclick="switchMode('standard')">1 Point</button>
+                    <button id="modeCustom" class="mode-btn" onclick="switchMode('custom')">Set Number</button>
+                </div>
+
+                <!-- Standard Score Buttons (+1 / -1) -->
+                <div id="standardControls" class="score-controls">
                     <button class="plus-btn" onclick="updateScore(1)">+1 POINT</button>
                     <button class="minus-btn" onclick="updateScore(-1)">-1</button>
+                </div>
+
+                <!-- Custom Score Controls -->
+                <div id="customControls" class="score-controls custom-controls-wrapper hidden" style="flex-direction: column; gap: 0;">
+                    <input type="number" id="customPointInput" placeholder="Enter Points (e.g. 2, 3)" pattern="\d*">
+                    <div style="display: flex; gap: 10px; width: 100%;">
+                        <button class="plus-btn" onclick="updateCustomScore(1)">ADD</button>
+                        <button class="minus-btn" onclick="updateCustomScore(-1)">REDUCE</button>
+                    </div>
                 </div>
 
                 <div style="display: flex; gap: 10px; width: 100%;">
@@ -320,7 +375,40 @@
             }
         }
 
-        // Modified to handle delta (positive or negative)
+        // Handle Mode Switching
+        function switchMode(mode) {
+            const standardDiv = document.getElementById('standardControls');
+            const customDiv = document.getElementById('customControls');
+            const standardBtn = document.getElementById('modeStandard');
+            const customBtn = document.getElementById('modeCustom');
+
+            if (mode === 'standard') {
+                standardDiv.classList.remove('hidden');
+                customDiv.classList.add('hidden');
+                standardBtn.classList.add('active');
+                customBtn.classList.remove('active');
+            } else {
+                standardDiv.classList.add('hidden');
+                customDiv.classList.remove('hidden');
+                standardBtn.classList.remove('active');
+                customBtn.classList.add('active');
+            }
+        }
+
+        // Update score with custom input
+        async function updateCustomScore(multiplier) {
+            const input = document.getElementById('customPointInput');
+            const points = parseInt(input.value);
+
+            if (!points || isNaN(points)) {
+                alert("Please enter a valid number of points.");
+                return;
+            }
+
+            await updateScore(points * multiplier);
+        }
+
+        // Core update function
         async function updateScore(delta) {
             try {
                 const res = await fetch('/api/score', {
