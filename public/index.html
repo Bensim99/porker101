@@ -260,6 +260,46 @@
             border-radius: 3px;
         }
 
+        /* Admin Dashboard Styles */
+        .admin-dashboard {
+            width: 100%;
+        }
+        
+        .admin-game-card {
+            background: #2a2a2a;
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #444;
+            border-radius: 5px;
+        }
+
+        .admin-session-row {
+            background: #333;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 3px;
+        }
+
+        .admin-score-edit {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 5px;
+        }
+
+        .admin-score-edit input {
+            width: 60px;
+            padding: 5px;
+            font-size: 1rem;
+        }
+
+        .admin-score-edit button {
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            margin: 0;
+            clip-path: none;
+        }
+
         /* Controls Container */
         .controls {
             margin-top: 20px;
@@ -330,8 +370,15 @@
                 <div class="history-title">Past Sessions History</div>
                 <div id="historyList"></div>
             </div>
-
         </div>
+
+        <!-- Admin Interface -->
+        <div id="adminSection" class="hidden admin-dashboard">
+            <h1>ADMIN PANEL</h1>
+            <button class="secondary" onclick="logout()" style="width:100%; margin-bottom: 20px;">LOGOUT</button>
+            <div id="adminGamesList"></div>
+        </div>
+
     </div>
 
     <script>
@@ -345,6 +392,14 @@
 
             if (!code || !name) {
                 alert("Please enter a code and your name");
+                return;
+            }
+
+            // ADMIN CHECK
+            if (code === 'ADMIN' && name.toUpperCase() === 'ADMIN') {
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('adminSection').classList.remove('hidden');
+                loadAdminData();
                 return;
             }
 
@@ -374,6 +429,85 @@
                 alert("Network error");
             }
         }
+
+        // --- ADMIN LOGIC ---
+        async function loadAdminData() {
+            try {
+                const res = await fetch('/api/admin/games');
+                if (res.ok) {
+                    const games = await res.json();
+                    renderAdminDashboard(games);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function renderAdminDashboard(games) {
+            const list = document.getElementById('adminGamesList');
+            list.innerHTML = '';
+
+            if(games.length === 0) {
+                list.innerHTML = '<p style="text-align:center">No games found.</p>';
+                return;
+            }
+
+            games.forEach(game => {
+                const card = document.createElement('div');
+                card.className = 'admin-game-card';
+                
+                let sessionsHtml = '';
+                // Show latest session first
+                game.sessions.slice().reverse().forEach((session, revIndex) => {
+                    const realIndex = game.sessions.length - 1 - revIndex;
+                    const date = new Date(session.date).toLocaleString();
+                    
+                    let scoresHtml = '';
+                    for (const [player, score] of Object.entries(session.scores)) {
+                        scoresHtml += `
+                            <div class="admin-score-edit">
+                                <span>${player}:</span>
+                                <input type="number" value="${score}" id="admin-score-${game.code}-${realIndex}-${player}">
+                                <button onclick="adminUpdateScore('${game.code}', ${realIndex}, '${player}')">SAVE</button>
+                            </div>
+                        `;
+                    }
+
+                    sessionsHtml += `
+                        <div class="admin-session-row">
+                            <div style="color:#aaa; font-size:0.8rem;">Session ${realIndex} (${date})</div>
+                            ${scoresHtml}
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <h3 style="text-align:left; border-bottom:1px solid #555; padding-bottom:5px;">GAME: ${game.code}</h3>
+                    <div style="font-size:0.8rem; margin-bottom:10px;">Players: ${game.players.join(', ')}</div>
+                    ${sessionsHtml}
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        async function adminUpdateScore(code, sessionIndex, player) {
+            const inputId = `admin-score-${code}-${sessionIndex}-${player}`;
+            const newScore = document.getElementById(inputId).value;
+
+            try {
+                const res = await fetch('/api/admin/update-score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, sessionIndex, player, newScore })
+                });
+                
+                if(res.ok) {
+                    alert('Score updated!');
+                    loadAdminData(); // Refresh
+                } else {
+                    alert('Failed to update.');
+                }
+            } catch(e) { console.error(e); alert('Error'); }
+        }
+        // -------------------
 
         // Handle Mode Switching
         function switchMode(mode) {

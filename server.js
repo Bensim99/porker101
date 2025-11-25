@@ -119,6 +119,39 @@ app.get('/api/game/:code', async (req, res) => {
     }
 });
 
+// --- ADMIN ROUTES ---
+
+// 5. Get All Games (Admin)
+app.get('/api/admin/games', async (req, res) => {
+    try {
+        const games = await Game.find({});
+        res.json(games);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 6. Update Specific Score (Admin)
+app.post('/api/admin/update-score', async (req, res) => {
+    const { code, sessionIndex, player, newScore } = req.body;
+    try {
+        const game = await Game.findOne({ code });
+        if (!game) return res.status(404).json({ error: "Game not found" });
+
+        if (game.sessions[sessionIndex]) {
+            game.sessions[sessionIndex].scores.set(player, parseInt(newScore));
+            game.markModified('sessions');
+            await game.save();
+            res.json(game);
+        } else {
+            res.status(404).json({ error: "Session not found" });
+        }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+
 // Serve frontend
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
