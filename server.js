@@ -122,10 +122,6 @@ app.get('/api/game/:code', async (req, res) => {
 // 5. Get All Public Games (for "Join Existing")
 app.get('/api/games', async (req, res) => {
     try {
-        // Fetch all games
-        // We sort client-side or here. Let's sort by latest session date desc.
-        // Mongoose aggregation is best but let's keep it simple: fetch all and sort in JS if dataset small,
-        // or use aggregation for scalability.
         const games = await Game.find({});
         
         // Sort by most recent session date
@@ -139,7 +135,8 @@ app.get('/api/games', async (req, res) => {
         const gameList = games.map(g => ({
             code: g.code,
             players: g.players,
-            lastPlayed: g.sessions[g.sessions.length - 1].date
+            lastPlayed: g.sessions[g.sessions.length - 1].date,
+            sessions: g.sessions // Include sessions for admin
         }));
 
         res.json(gameList);
@@ -148,9 +145,7 @@ app.get('/api/games', async (req, res) => {
     }
 });
 
-// --- ADMIN ROUTES ---
-
-// 6. Get All Games (Admin) - same as above basically but maybe more detail later
+// 6. Get All Games (Admin)
 app.get('/api/admin/games', async (req, res) => {
     try {
         const games = await Game.find({});
@@ -175,6 +170,42 @@ app.post('/api/admin/update-score', async (req, res) => {
         } else {
             res.status(404).json({ error: "Session not found" });
         }
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 8. Delete Game (Admin)
+app.post('/api/admin/delete-game', async (req, res) => {
+    const { code } = req.body;
+    try {
+        await Game.deleteOne({ code });
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 9. Delete Player (Admin)
+app.post('/api/admin/delete-player', async (req, res) => {
+    const { code, player } = req.body;
+    try {
+        const game = await Game.findOne({ code });
+        if (!game) return res.status(404).json({ error: "Game not found" });
+
+        // Remove from players list
+        game.players = game.players.filter(p => p !== player);
+
+        // Remove from all sessions
+        game.sessions.forEach(session => {
+            if (session.scores.has(player)) {
+                session.scores.delete(player);
+            }
+        });
+
+        game.markModified('sessions');
+        await game.save();
+        res.json(game);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }

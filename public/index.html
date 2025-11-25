@@ -382,6 +382,38 @@
             clip-path: none;
         }
 
+        .admin-delete-btn {
+            background: #ff3333;
+            color: white;
+            font-size: 0.8rem;
+            padding: 5px 10px;
+            margin-left: 10px;
+            clip-path: none;
+        }
+
+        .admin-delete-game-btn {
+            background: #ff3333;
+            color: white;
+            width: 100%;
+            margin-top: 10px;
+            clip-path: none;
+        }
+        
+        .admin-player-list {
+            margin: 10px 0;
+            padding: 10px;
+            background: #1a1a1a;
+            border-radius: 5px;
+        }
+        
+        .admin-player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px dashed #444;
+        }
+
         /* Controls Container */
         .controls {
             margin-top: 20px;
@@ -623,7 +655,20 @@
                 const card = document.createElement('div');
                 card.className = 'admin-game-card';
                 
+                // Player Management Section
+                let playersHtml = '<div class="admin-player-list"><strong>Manage Players:</strong>';
+                game.players.forEach(p => {
+                    playersHtml += `
+                        <div class="admin-player-item">
+                            <span>${p}</span>
+                            <button class="admin-delete-btn" onclick="adminDeletePlayer('${game.code}', '${p}')">DELETE</button>
+                        </div>
+                    `;
+                });
+                playersHtml += '</div>';
+                
                 let sessionsHtml = '';
+                // Show latest session first
                 game.sessions.slice().reverse().forEach((session, revIndex) => {
                     const realIndex = game.sessions.length - 1 - revIndex;
                     const date = new Date(session.date).toLocaleString();
@@ -649,11 +694,43 @@
 
                 card.innerHTML = `
                     <h3 style="text-align:left; border-bottom:1px solid #555; padding-bottom:5px;">GAME: ${game.code}</h3>
-                    <div style="font-size:0.8rem; margin-bottom:10px;">Players: ${game.players.join(', ')}</div>
+                    ${playersHtml}
                     ${sessionsHtml}
+                    <button class="admin-delete-game-btn" onclick="adminDeleteGame('${game.code}')">DELETE GAME PERMANENTLY</button>
                 `;
                 list.appendChild(card);
             });
+        }
+        
+        async function adminDeleteGame(code) {
+            if(!confirm(`Are you sure you want to delete game ${code}? This cannot be undone.`)) return;
+            
+            try {
+                const res = await fetch('/api/admin/delete-game', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code })
+                });
+                if(res.ok) {
+                    alert('Game deleted');
+                    loadAdminData();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        async function adminDeletePlayer(code, player) {
+            if(!confirm(`Remove player ${player} from game ${code}? Their scores will be removed.`)) return;
+
+            try {
+                const res = await fetch('/api/admin/delete-player', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, player })
+                });
+                if(res.ok) {
+                    loadAdminData();
+                }
+            } catch(e) { console.error(e); }
         }
 
         async function adminUpdateScore(code, sessionIndex, player) {
