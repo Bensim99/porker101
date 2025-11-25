@@ -81,6 +81,45 @@
             background: var(--led-orange);
             width: 50%;
         }
+        
+        .browse-btn {
+            background: #555;
+            color: white;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+
+        /* Existing Games List */
+        .games-list-container {
+            margin-top: 20px;
+            text-align: left;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .game-list-item {
+            background: #333;
+            border: 1px solid #444;
+            padding: 10px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .game-list-item:hover {
+            background: #444;
+        }
+
+        .game-code {
+            color: var(--led-orange);
+            font-weight: bold;
+        }
+
+        .game-meta {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+
 
         /* Mode Switcher Styles */
         .mode-switcher {
@@ -322,6 +361,12 @@
             <input type="text" id="playerName" placeholder="Your Name" maxlength="10">
             <br>
             <button class="join-btn" onclick="joinGame()">Enter Game</button>
+            <button class="browse-btn" onclick="toggleGameList()">Browse Existing Games</button>
+            
+            <!-- Game List Container -->
+            <div id="gamesList" class="games-list-container hidden">
+                <div style="text-align:center; color:#777;">Loading...</div>
+            </div>
         </div>
 
         <!-- Game Interface -->
@@ -429,6 +474,55 @@
                 alert("Network error");
             }
         }
+
+        // --- NEW: BROWSE GAMES LOGIC ---
+        async function toggleGameList() {
+            const listContainer = document.getElementById('gamesList');
+            if (listContainer.classList.contains('hidden')) {
+                listContainer.classList.remove('hidden');
+                // Fetch games
+                try {
+                    const res = await fetch('/api/games');
+                    if(res.ok) {
+                        const games = await res.json();
+                        renderGamesList(games);
+                    }
+                } catch(e) {
+                    listContainer.innerHTML = '<p style="color:red;text-align:center">Error loading games</p>';
+                }
+            } else {
+                listContainer.classList.add('hidden');
+            }
+        }
+
+        function renderGamesList(games) {
+            const listContainer = document.getElementById('gamesList');
+            listContainer.innerHTML = '';
+
+            if (games.length === 0) {
+                listContainer.innerHTML = '<p style="text-align:center; color:#aaa;">No active games found.</p>';
+                return;
+            }
+
+            games.forEach(game => {
+                const div = document.createElement('div');
+                div.className = 'game-list-item';
+                const date = new Date(game.lastPlayed).toLocaleDateString();
+                
+                div.innerHTML = `
+                    <div class="game-code">${game.code}</div>
+                    <div class="game-meta">Players: ${game.players.join(', ')}</div>
+                    <div class="game-meta">Last Played: ${date}</div>
+                `;
+                div.onclick = () => {
+                    document.getElementById('gameCode').value = game.code;
+                    // Optionally, prompt or confirm name input, then join
+                    alert(`Selected Room: ${game.code}. Enter your name to join!`);
+                };
+                listContainer.appendChild(div);
+            });
+        }
+        // -------------------------------
 
         // --- ADMIN LOGIC ---
         async function loadAdminData() {

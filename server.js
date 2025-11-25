@@ -119,9 +119,38 @@ app.get('/api/game/:code', async (req, res) => {
     }
 });
 
+// 5. Get All Public Games (for "Join Existing")
+app.get('/api/games', async (req, res) => {
+    try {
+        // Fetch all games
+        // We sort client-side or here. Let's sort by latest session date desc.
+        // Mongoose aggregation is best but let's keep it simple: fetch all and sort in JS if dataset small,
+        // or use aggregation for scalability.
+        const games = await Game.find({});
+        
+        // Sort by most recent session date
+        games.sort((a, b) => {
+            const dateA = a.sessions[a.sessions.length - 1].date;
+            const dateB = b.sessions[b.sessions.length - 1].date;
+            return new Date(dateB) - new Date(dateA);
+        });
+
+        // Map to lightweight object
+        const gameList = games.map(g => ({
+            code: g.code,
+            players: g.players,
+            lastPlayed: g.sessions[g.sessions.length - 1].date
+        }));
+
+        res.json(gameList);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // --- ADMIN ROUTES ---
 
-// 5. Get All Games (Admin)
+// 6. Get All Games (Admin) - same as above basically but maybe more detail later
 app.get('/api/admin/games', async (req, res) => {
     try {
         const games = await Game.find({});
@@ -131,7 +160,7 @@ app.get('/api/admin/games', async (req, res) => {
     }
 });
 
-// 6. Update Specific Score (Admin)
+// 7. Update Specific Score (Admin)
 app.post('/api/admin/update-score', async (req, res) => {
     const { code, sessionIndex, player, newScore } = req.body;
     try {
@@ -150,7 +179,6 @@ app.post('/api/admin/update-score', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
-
 
 // Serve frontend
 app.get('*', (req, res) => {
