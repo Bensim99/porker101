@@ -93,7 +93,7 @@
         .games-list-container {
             margin-top: 20px;
             text-align: left;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
         }
 
@@ -101,23 +101,66 @@
             background: #333;
             border: 1px solid #444;
             padding: 10px;
-            margin-bottom: 5px;
-            cursor: pointer;
-            transition: background 0.2s;
+            margin-bottom: 10px;
+            border-radius: 5px;
         }
 
-        .game-list-item:hover {
-            background: #444;
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        
+        .game-header:hover {
+             color: var(--led-orange);
         }
 
         .game-code {
             color: var(--led-orange);
             font-weight: bold;
+            font-size: 1.2rem;
         }
 
         .game-meta {
             font-size: 0.8rem;
             color: #aaa;
+        }
+
+        /* Player Selection inside Game Item */
+        .player-selection-list {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            background: #222;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .player-select-btn {
+            background: #444;
+            color: #ddd;
+            padding: 8px;
+            font-size: 0.9rem;
+            text-align: left;
+            width: 100%;
+            clip-path: none; /* Standard button shape */
+            margin-top: 0;
+        }
+        
+        .player-select-btn:hover {
+            background: #555;
+            color: white;
+        }
+
+        .add-player-btn {
+            background: #28a745;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            clip-path: none;
+            margin-top: 5px;
         }
 
 
@@ -361,11 +404,10 @@
             <input type="text" id="playerName" placeholder="Your Name" maxlength="10">
             <br>
             <button class="join-btn" onclick="joinGame()">Enter Game</button>
-            <button class="browse-btn" onclick="toggleGameList()">Browse Existing Games</button>
             
-            <!-- Game List Container -->
-            <div id="gamesList" class="games-list-container hidden">
-                <div style="text-align:center; color:#777;">Loading...</div>
+            <!-- Game List Container (Now Visible by Default via JS) -->
+            <div id="gamesList" class="games-list-container">
+                <div style="text-align:center; color:#777;">Loading games...</div>
             </div>
         </div>
 
@@ -431,10 +473,17 @@
         let currentCode = '';
         let pollingInterval = null;
 
+        // Auto load games on start
+        window.onload = loadGamesList;
+
         async function joinGame() {
             const code = document.getElementById('gameCode').value.toUpperCase().trim();
             const name = document.getElementById('playerName').value.trim();
 
+            performJoin(code, name);
+        }
+
+        async function performJoin(code, name) {
             if (!code || !name) {
                 alert("Please enter a code and your name");
                 return;
@@ -475,23 +524,17 @@
             }
         }
 
-        // --- NEW: BROWSE GAMES LOGIC ---
-        async function toggleGameList() {
+        // --- BROWSE GAMES LOGIC ---
+        async function loadGamesList() {
             const listContainer = document.getElementById('gamesList');
-            if (listContainer.classList.contains('hidden')) {
-                listContainer.classList.remove('hidden');
-                // Fetch games
-                try {
-                    const res = await fetch('/api/games');
-                    if(res.ok) {
-                        const games = await res.json();
-                        renderGamesList(games);
-                    }
-                } catch(e) {
-                    listContainer.innerHTML = '<p style="color:red;text-align:center">Error loading games</p>';
+            try {
+                const res = await fetch('/api/games');
+                if(res.ok) {
+                    const games = await res.json();
+                    renderGamesList(games);
                 }
-            } else {
-                listContainer.classList.add('hidden');
+            } catch(e) {
+                listContainer.innerHTML = '<p style="color:red;text-align:center">Error loading games</p>';
             }
         }
 
@@ -509,18 +552,50 @@
                 div.className = 'game-list-item';
                 const date = new Date(game.lastPlayed).toLocaleDateString();
                 
+                // Build Player Buttons
+                let playersHtml = '';
+                game.players.forEach(player => {
+                    playersHtml += `<button class="player-select-btn" onclick="selectExistingPlayer('${game.code}', '${player}')">Join as ${player}</button>`;
+                });
+
+                // Add 'Add New Player' button logic
+                playersHtml += `<button class="player-select-btn add-player-btn" onclick="promptNewPlayer('${game.code}')">+ ADD NEW PLAYER</button>`;
+
                 div.innerHTML = `
-                    <div class="game-code">${game.code}</div>
-                    <div class="game-meta">Players: ${game.players.join(', ')}</div>
-                    <div class="game-meta">Last Played: ${date}</div>
+                    <div class="game-header" onclick="togglePlayersView('${game.code}')">
+                        <div>
+                            <div class="game-code">${game.code}</div>
+                            <div class="game-meta">Last Played: ${date}</div>
+                        </div>
+                        <div style="font-size: 1.5rem;">⌄</div>
+                    </div>
+                    <div id="players-${game.code}" class="player-selection-list hidden">
+                        <div style="color:#aaa; margin-bottom:5px; font-size:0.8rem;">Select Player:</div>
+                        ${playersHtml}
+                    </div>
                 `;
-                div.onclick = () => {
-                    document.getElementById('gameCode').value = game.code;
-                    // Optionally, prompt or confirm name input, then join
-                    alert(`Selected Room: ${game.code}. Enter your name to join!`);
-                };
                 listContainer.appendChild(div);
             });
+        }
+
+        function togglePlayersView(code) {
+            const el = document.getElementById(`players-${code}`);
+            el.classList.toggle('hidden');
+        }
+
+        function selectExistingPlayer(code, name) {
+            document.getElementById('gameCode').value = code;
+            document.getElementById('playerName').value = name;
+            performJoin(code, name);
+        }
+
+        function promptNewPlayer(code) {
+            const name = prompt("Enter new player name:");
+            if(name) {
+                document.getElementById('gameCode').value = code;
+                document.getElementById('playerName').value = name;
+                performJoin(code, name);
+            }
         }
         // -------------------------------
 
@@ -549,7 +624,6 @@
                 card.className = 'admin-game-card';
                 
                 let sessionsHtml = '';
-                // Show latest session first
                 game.sessions.slice().reverse().forEach((session, revIndex) => {
                     const realIndex = game.sessions.length - 1 - revIndex;
                     const date = new Date(session.date).toLocaleString();
@@ -595,7 +669,7 @@
                 
                 if(res.ok) {
                     alert('Score updated!');
-                    loadAdminData(); // Refresh
+                    loadAdminData(); 
                 } else {
                     alert('Failed to update.');
                 }
@@ -623,7 +697,6 @@
             }
         }
 
-        // Update score with custom input
         async function updateCustomScore(multiplier) {
             const input = document.getElementById('customPointInput');
             const points = parseInt(input.value);
@@ -636,7 +709,6 @@
             await updateScore(points * multiplier);
         }
 
-        // Core update function
         async function updateScore(delta) {
             try {
                 const res = await fetch('/api/score', {
@@ -718,7 +790,6 @@
                 list.appendChild(row);
             });
 
-            // Render History
             renderHistory(game);
         }
 
@@ -726,7 +797,6 @@
             const historyContainer = document.getElementById('historyContainer');
             const historyList = document.getElementById('historyList');
             
-            // Only show if there are past sessions (more than 1 session total)
             if (game.sessions.length <= 1) {
                 historyContainer.classList.add('hidden');
                 return;
@@ -735,8 +805,6 @@
             historyContainer.classList.remove('hidden');
             historyList.innerHTML = '';
 
-            // Iterate through all sessions EXCEPT the last one (current)
-            // We reverse to show newest history first
             const pastSessions = game.sessions.slice(0, -1).reverse();
 
             pastSessions.forEach((session, index) => {
@@ -745,7 +813,6 @@
                 item.className = 'history-item';
                 
                 let scoresHtml = '';
-                // Sort scores in history item by score value desc
                 const sessionEntries = Object.entries(session.scores)
                     .sort(([, scoreA], [, scoreB]) => scoreB - scoreA);
 
