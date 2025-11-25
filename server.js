@@ -1,6 +1,8 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
+require('dotenv').config(); // Load env variables for local dev
+
 const app = express();
 
 // Middleware
@@ -8,8 +10,6 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // MongoDB Connection
-// In production (Render), we use the environment variable. 
-// Locally, you can create a .env file or hardcode for testing (but don't commit secrets!)
 const MONGO_URI = process.env.MONGO_URI;
 
 if (MONGO_URI) {
@@ -24,10 +24,8 @@ if (MONGO_URI) {
 const GameSchema = new mongoose.Schema({
     code: { type: String, unique: true, required: true },
     players: [String], // List of player names
-    // Sessions: Each item is a "date" or a "match"
     sessions: [{
         date: { type: Date, default: Date.now },
-        // We use a flexible object to map "PlayerName": Score
         scores: { type: Map, of: Number, default: {} }
     }]
 });
@@ -45,18 +43,15 @@ app.post('/api/join', async (req, res) => {
         let game = await Game.findOne({ code });
 
         if (!game) {
-            // Create new game with initial session
             game = new Game({
                 code,
                 players: [name],
                 sessions: [{ date: new Date(), scores: { [name]: 0 } }]
             });
         } else {
-            // Add player if not exists
             if (!game.players.includes(name)) {
                 game.players.push(name);
             }
-            // Ensure current session exists and initialize player score if missing
             const currentSession = game.sessions[game.sessions.length - 1];
             if (!currentSession.scores.has(name)) {
                 currentSession.scores.set(name, 0);
@@ -69,21 +64,21 @@ app.post('/api/join', async (req, res) => {
     }
 });
 
-// 2. Add Score
+// 2. Update Score (Add or Subtract)
 app.post('/api/score', async (req, res) => {
-    const { code, name } = req.body;
+    const { code, name, delta } = req.body; // 'delta' determines +1 or -1
+    const change = delta ? parseInt(delta) : 1;
+
     try {
         const game = await Game.findOne({ code });
         if (!game) return res.status(404).json({ error: "Game not found" });
 
-        // Get the latest session
         const currentSession = game.sessions[game.sessions.length - 1];
         
-        // Increment score
         const currentScore = currentSession.scores.get(name) || 0;
-        currentSession.scores.set(name, currentScore + 1);
+        // Update score
+        currentSession.scores.set(name, currentScore + change);
 
-        // Mark as modified because Maps don't always trigger updates automatically
         game.markModified('sessions');
         await game.save();
         res.json(game);
@@ -99,7 +94,6 @@ app.post('/api/new-session', async (req, res) => {
         const game = await Game.findOne({ code });
         if (!game) return res.status(404).json({ error: "Game not found" });
 
-        // Initialize new scores for all existing players
         const newScores = {};
         game.players.forEach(p => newScores[p] = 0);
 
@@ -115,7 +109,7 @@ app.post('/api/new-session', async (req, res) => {
     }
 });
 
-// 4. Get Game State (Polling)
+// 4. Get Game State
 app.get('/api/game/:code', async (req, res) => {
     try {
         const game = await Game.findOne({ code: req.params.code });

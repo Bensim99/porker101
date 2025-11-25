@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hoops Scoreboard</title>
-    <!-- Google Fonts for Scoreboard look -->
     <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -62,7 +61,6 @@
         button {
             cursor: pointer;
             padding: 12px 24px;
-            background: var(--led-orange);
             border: none;
             color: black;
             font-weight: bold;
@@ -75,6 +73,36 @@
 
         button:active {
             transform: scale(0.98);
+        }
+
+        /* Join Button */
+        .join-btn {
+            background: var(--led-orange);
+            width: 50%;
+        }
+
+        /* Score Buttons Layout */
+        .score-controls {
+            display: flex;
+            width: 100%;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .plus-btn {
+            flex: 2; /* Takes 2/3 of space */
+            padding: 20px;
+            font-size: 1.5rem;
+            background: #28a745; /* Green */
+            color: white;
+        }
+
+        .minus-btn {
+            flex: 1; /* Takes 1/3 of space */
+            padding: 20px;
+            font-size: 1.5rem;
+            background: var(--led-red); /* Red */
+            color: white;
         }
 
         button.secondary {
@@ -145,21 +173,13 @@
         .total-val { color: var(--led-orange); text-shadow: 0 0 10px rgba(255, 170, 0, 0.4); }
         .current-val { color: var(--led-red); text-shadow: 0 0 10px rgba(255, 51, 51, 0.4); }
 
-        /* Controls */
+        /* Controls Container */
         .controls {
             margin-top: 20px;
             display: flex;
             flex-direction: column;
             gap: 10px;
             align-items: center;
-        }
-
-        .big-btn {
-            width: 100%;
-            padding: 20px;
-            font-size: 1.5rem;
-            background: #28a745; /* Green for add point */
-            color: white;
         }
 
         .hidden { display: none; }
@@ -174,7 +194,7 @@
             <input type="text" id="gameCode" placeholder="Enter Game Code (e.g. PARTY1)" maxlength="10">
             <input type="text" id="playerName" placeholder="Your Name" maxlength="10">
             <br>
-            <button onclick="joinGame()">Enter Game</button>
+            <button class="join-btn" onclick="joinGame()">Enter Game</button>
         </div>
 
         <!-- Game Interface -->
@@ -191,7 +211,12 @@
             </div>
 
             <div class="controls">
-                <button class="big-btn" onclick="addPoint()">+1 POINT</button>
+                <!-- Score Buttons Layout -->
+                <div class="score-controls">
+                    <button class="plus-btn" onclick="updateScore(1)">+1 POINT</button>
+                    <button class="minus-btn" onclick="updateScore(-1)">-1</button>
+                </div>
+
                 <div style="display: flex; gap: 10px; width: 100%;">
                     <button class="secondary" style="flex:1" onclick="newSession()">New Session (Clean Slate)</button>
                     <button class="secondary" style="flex:1" onclick="logout()">Exit</button>
@@ -241,12 +266,13 @@
             }
         }
 
-        async function addPoint() {
+        // Modified to handle delta (positive or negative)
+        async function updateScore(delta) {
             try {
                 const res = await fetch('/api/score', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: currentCode, name: currentUser })
+                    body: JSON.stringify({ code: currentCode, name: currentUser, delta: delta })
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -283,10 +309,8 @@
             const totalScores = {};
             const currentScores = currentSession.scores;
 
-            // Initialize 0 for all known players
             game.players.forEach(p => totalScores[p] = 0);
 
-            // Sum up all sessions
             game.sessions.forEach(session => {
                 for (const [player, score] of Object.entries(session.scores)) {
                     if (totalScores[player] !== undefined) {
@@ -295,7 +319,6 @@
                 }
             });
 
-            // Sort players by TOTAL score descending
             const sortedPlayers = game.players.sort((a, b) => totalScores[b] - totalScores[a]);
 
             sortedPlayers.forEach(player => {
@@ -336,7 +359,7 @@
                         renderBoard(data);
                     }
                 } catch (e) { console.error("Polling error", e); }
-            }, 3000); // Check for updates every 3 seconds
+            }, 3000); 
         }
 
         function logout() {
