@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoops Scoreboard</title>
+    <!-- Google Fonts for Scoreboard look -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --led-red: #ff3333;
+            --led-orange: #ffaa00;
+            --bg-color: #1a1a1a;
+            --panel-bg: #000000;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1, h2, h3 {
+            font-family: 'Black Ops One', cursive;
+            text-transform: uppercase;
+            margin: 5px 0;
+            text-align: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+        }
+
+        /* Forms */
+        .login-box {
+            background: #2a2a2a;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        input {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #333;
+            border: 2px solid #555;
+            color: white;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 12px 24px;
+            background: var(--led-orange);
+            border: none;
+            color: black;
+            font-weight: bold;
+            font-size: 1rem;
+            text-transform: uppercase;
+            margin-top: 10px;
+            clip-path: polygon(10% 0, 100% 0, 100% 80%, 90% 100%, 0 100%, 0 20%);
+            transition: transform 0.1s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.secondary {
+            background: #555;
+            color: white;
+            font-size: 0.8rem;
+        }
+
+        /* Scoreboard Interface */
+        .scoreboard {
+            background: var(--panel-bg);
+            border: 8px solid #333;
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .header-info {
+            display: flex;
+            justify-content: space-between;
+            color: #777;
+            font-size: 0.8rem;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .player-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px dashed #333;
+        }
+
+        .player-name {
+            font-size: 1.2rem;
+            color: #ddd;
+            flex: 1;
+        }
+
+        .scores-display {
+            display: flex;
+            gap: 20px;
+            text-align: center;
+        }
+
+        .score-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 80px;
+        }
+
+        .score-label {
+            font-size: 0.6rem;
+            color: #777;
+            margin-bottom: 2px;
+        }
+
+        .score-val {
+            font-family: 'Black Ops One', cursive;
+            font-size: 2rem;
+            line-height: 1;
+        }
+
+        .total-val { color: var(--led-orange); text-shadow: 0 0 10px rgba(255, 170, 0, 0.4); }
+        .current-val { color: var(--led-red); text-shadow: 0 0 10px rgba(255, 51, 51, 0.4); }
+
+        /* Controls */
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .big-btn {
+            width: 100%;
+            padding: 20px;
+            font-size: 1.5rem;
+            background: #28a745; /* Green for add point */
+            color: white;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Login Screen -->
+        <div id="loginSection" class="login-box">
+            <h1>Game Join</h1>
+            <input type="text" id="gameCode" placeholder="Enter Game Code (e.g. PARTY1)" maxlength="10">
+            <input type="text" id="playerName" placeholder="Your Name" maxlength="10">
+            <br>
+            <button onclick="joinGame()">Enter Game</button>
+        </div>
+
+        <!-- Game Interface -->
+        <div id="gameSection" class="hidden">
+            <div class="scoreboard">
+                <div class="header-info">
+                    <span id="displayCode">ROOM: ---</span>
+                    <span id="displayDate">SESSION: ---</span>
+                </div>
+                
+                <div id="scoresList">
+                    <!-- Player rows injected here -->
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="big-btn" onclick="addPoint()">+1 POINT</button>
+                <div style="display: flex; gap: 10px; width: 100%;">
+                    <button class="secondary" style="flex:1" onclick="newSession()">New Session (Clean Slate)</button>
+                    <button class="secondary" style="flex:1" onclick="logout()">Exit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = '';
+        let currentCode = '';
+        let pollingInterval = null;
+
+        async function joinGame() {
+            const code = document.getElementById('gameCode').value.toUpperCase().trim();
+            const name = document.getElementById('playerName').value.trim();
+
+            if (!code || !name) {
+                alert("Please enter a code and your name");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code, name })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    currentUser = name;
+                    currentCode = code;
+                    
+                    document.getElementById('loginSection').classList.add('hidden');
+                    document.getElementById('gameSection').classList.remove('hidden');
+                    document.getElementById('displayCode').innerText = `ROOM: ${code}`;
+
+                    renderBoard(data);
+                    startPolling();
+                } else {
+                    alert("Error joining game");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Network error");
+            }
+        }
+
+        async function addPoint() {
+            try {
+                const res = await fetch('/api/score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: currentCode, name: currentUser })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderBoard(data);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function newSession() {
+            if(!confirm("Start a clean scoreboard? Total scores will be saved.")) return;
+
+            try {
+                const res = await fetch('/api/new-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: currentCode })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderBoard(data);
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function renderBoard(game) {
+            const list = document.getElementById('scoresList');
+            list.innerHTML = '';
+
+            const currentSession = game.sessions[game.sessions.length - 1];
+            const sessionDate = new Date(currentSession.date).toLocaleDateString();
+            document.getElementById('displayDate').innerText = `DATE: ${sessionDate}`;
+
+            // Calculate totals
+            const totalScores = {};
+            const currentScores = currentSession.scores;
+
+            // Initialize 0 for all known players
+            game.players.forEach(p => totalScores[p] = 0);
+
+            // Sum up all sessions
+            game.sessions.forEach(session => {
+                for (const [player, score] of Object.entries(session.scores)) {
+                    if (totalScores[player] !== undefined) {
+                        totalScores[player] += score;
+                    }
+                }
+            });
+
+            // Sort players by TOTAL score descending
+            const sortedPlayers = game.players.sort((a, b) => totalScores[b] - totalScores[a]);
+
+            sortedPlayers.forEach(player => {
+                const isMe = player === currentUser;
+                const currentVal = currentScores[player] || 0;
+                const totalVal = totalScores[player] || 0;
+
+                const row = document.createElement('div');
+                row.className = 'player-row';
+                if (isMe) row.style.background = '#333333';
+                
+                row.innerHTML = `
+                    <div class="player-name" style="${isMe ? 'color:#fff; font-weight:bold; padding-left:10px;' : 'padding-left:10px;'}">
+                        ${player} ${isMe ? '(YOU)' : ''}
+                    </div>
+                    <div class="scores-display">
+                        <div class="score-box">
+                            <span class="score-label">CURRENT</span>
+                            <span class="score-val current-val">${currentVal}</span>
+                        </div>
+                        <div class="score-box">
+                            <span class="score-label">ALL TIME</span>
+                            <span class="score-val total-val">${totalVal}</span>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        function startPolling() {
+            if (pollingInterval) clearInterval(pollingInterval);
+            pollingInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/game/${currentCode}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        renderBoard(data);
+                    }
+                } catch (e) { console.error("Polling error", e); }
+            }, 3000); // Check for updates every 3 seconds
+        }
+
+        function logout() {
+            location.reload();
+        }
+    </script>
+</body>
+</html>
